@@ -71,3 +71,23 @@ def test_duplicate_train_is_rejected(tmp_path, monkeypatch):
     monkeypatch.setattr(train, "DATASET_DIR", tmp_path)
     with pytest.raises(ValueError, match="multiple train.csv"):
         train._read_csv("train")
+
+
+def test_normalize_member_rejects_traversal_and_absolute():
+    assert train._normalize_member("train.csv") == "train.csv"
+    assert train._normalize_member("./train.csv") == "train.csv"
+    assert train._normalize_member("dataset/train.csv") == "train.csv"
+    for hostile in ("../train.csv", "../../etc/passwd", "/train.csv", "dataset/../secret.csv"):
+        with pytest.raises(ValueError, match="unsafe archive member"):
+            train._normalize_member(hostile)
+
+
+def test_prepare_frames_rejects_target_in_drop_columns():
+    with pytest.raises(ValueError, match="must not appear in drop_columns"):
+        train._prepare_frames({"target_column": "target", "drop_columns": "target,x"}, 0)
+
+
+def test_stratified_cap_rejects_cap_below_class_count():
+    frame = pd.DataFrame({"x": range(10), "target": [f"c{i}" for i in range(10)]})
+    with pytest.raises(ValueError, match="below the class count"):
+        train._stratified_cap(frame, "target", 5, 0)
