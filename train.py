@@ -4,7 +4,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import shutil
 import sys
 import traceback
 import zipfile
@@ -325,6 +324,14 @@ def run() -> int:
     smoke_rows = min(8, len(val))
     if smoke_rows:
         _ = reloaded.predict(X_val.iloc[:smoke_rows])
+
+    # Keep only best.ckpt in the served artifact; drop intermediate epoch checkpoints.
+    pruned_bytes = 0
+    for stale in sorted(ckpt_dir.glob("epoch*.ckpt")):
+        pruned_bytes += stale.stat().st_size
+        stale.unlink()
+    if pruned_bytes:
+        log(f"Pruned {pruned_bytes} bytes of intermediate epoch checkpoints")
 
     payload = {
         "successful": True,
