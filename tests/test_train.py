@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import zipfile
 
@@ -7,10 +8,44 @@ import pytest
 import train
 
 
+@pytest.fixture(autouse=True)
+def _reset_limits():
+    train._load_limits()
+    yield
+
+
 def _zip(path: Path, files: dict[str, str]) -> None:
     with zipfile.ZipFile(path, "w") as zf:
         for name, content in files.items():
             zf.writestr(name, content)
+
+
+def test_load_limits_rejects_malformed_env(monkeypatch):
+    monkeypatch.setenv("DIMER_MAX_SINGLE_CSV_BYTES", "not-an-int")
+    with pytest.raises(ValueError):
+        train._load_limits()
+
+
+def test_main_writes_failure_on_malformed_config(tmp_path, monkeypatch):
+    monkeypatch.setenv("DIMER_MAX_SINGLE_CSV_BYTES", "not-an-int")
+    monkeypatch.setattr(train, "RESULT_PATH", tmp_path / "result.json")
+    assert train.main() == 1
+    payload = json.loads((tmp_path / "result.json").read_text())
+    assert payload["successful"] is False
+
+
+def test_batched_predict_chunks_and_matches(monkeypatch):
+    monkeypatch.setattr(train, "PREDICT_BATCH_ROWS", 3)
+    X = pd.DataFrame({"a": range(10)})
+    calls = []
+
+    def fake(sub):
+        calls.append(len(sub))
+        return sub["a"].to_numpy()
+
+    out = train._batched(fake, X)
+    assert list(out) == list(range(10))
+    assert calls == [3, 3, 3, 1]
 
 
 def test_stratified_holdout_preserves_classes():
