@@ -15,3 +15,18 @@ Key behavior:
 - records dataset and checkpoint hashes in `result.json`
 
 `dimer-pipeline.json` defines the DIMER workbench fields. Pairs with `tabicl-classifier-dataset-validator`; full documentation is in `tabicl-classifier-pipeline`.
+
+## DIMER Pipeline Builder integration
+
+The repository builds directly with the **repository root as the Docker build
+context**; the Dockerfile invokes root-level `train.py`. Root layout:
+`Dockerfile`, `train.py`, `requirements.txt`, `README.md`, `dimer-pipeline.json`.
+
+- Every `datasetPreprocessing` key is read from `DIMER_PREPROCESSING_ARGS_JSON`
+  and every `modelFinetuning` key from `DIMER_HYPERPARAMETERS_JSON`, 1:1 — no
+  manifest control is silently ignored (guarded by
+  `tests/test_train.py::test_manifest_matches_env_consumption`).
+- `model_id` is intentionally **not** a manifest parameter; the DIMER Base Model
+  selection is authoritative.
+- The image bakes `DIMER_TASK_TYPE=tabular_classification` as the fallback for
+  DIMER Custom / Other pipelines.
