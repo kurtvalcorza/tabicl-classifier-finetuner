@@ -163,3 +163,23 @@ def test_stratified_cap_rejects_cap_below_class_count():
     frame = pd.DataFrame({"x": range(10), "target": [f"c{i}" for i in range(10)]})
     with pytest.raises(ValueError, match="below the class count"):
         train._stratified_cap(frame, "target", 5, 0)
+
+
+def test_manifest_matches_env_consumption():
+    # Every DIMER manifest control must map 1:1 to a value train.py actually
+    # reads from the env JSON, and nothing may be read that the manifest does
+    # not declare. Guards against a silently-ignored (or undeclared) parameter.
+    import re
+
+    root = Path(__file__).parents[1]
+    manifest = json.loads((root / "dimer-pipeline.json").read_text())
+    src = (root / "train.py").read_text()
+    hp_keys = set(re.findall(r"hp\.get\(\s*[\"']([^\"']+)[\"']", src))
+    pre_keys = set(re.findall(r"pre\.get\(\s*[\"']([^\"']+)[\"']", src))
+    manifest_hp = set(manifest["modelFinetuning"])
+    manifest_pre = set(manifest["datasetPreprocessing"])
+    assert manifest_hp <= hp_keys, f"manifest hyperparameters not consumed: {manifest_hp - hp_keys}"
+    assert manifest_pre <= pre_keys, f"manifest preprocessing keys not consumed: {manifest_pre - pre_keys}"
+    assert hp_keys <= manifest_hp, f"consumed but undeclared hyperparameters: {hp_keys - manifest_hp}"
+    assert pre_keys <= manifest_pre, f"consumed but undeclared preprocessing keys: {pre_keys - manifest_pre}"
+    assert "model_id" not in manifest_hp | manifest_pre
