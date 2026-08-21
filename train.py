@@ -115,6 +115,16 @@ def _normalize_device_string(raw: str) -> str:
     )
 
 
+def _resolve_task_type(pipeline_metadata: dict[str, Any]) -> str:
+    """taskType precedence: DIMER metadata -> baked DIMER_TASK_TYPE env
+    (Custom/Other pipelines) -> model-family literal."""
+    return (
+        pipeline_metadata.get("taskType")
+        or os.getenv("DIMER_TASK_TYPE")
+        or "tabular_classification"
+    )
+
+
 def _resolve_train_device() -> str:
     """Resolve the training device from DIMER_TRAIN_DEVICE, honoring the operator's
     GPU assignment. Requires CUDA to be available (no CPU fine-tune path)."""
@@ -439,6 +449,7 @@ def run() -> int:
     _load_limits()
     hp = _json_env("DIMER_HYPERPARAMETERS_JSON")
     pre = _json_env("DIMER_PREPROCESSING_ARGS_JSON")
+    pipeline_metadata = _json_env("DIMER_PIPELINE_METADATA_JSON")
     seed = int(hp.get("seed") or 0)
     train, val, test, target, feature_columns = _prepare_frames(pre, seed)
 
@@ -618,7 +629,7 @@ def run() -> int:
         },
         "metadata": {
             "template": TEMPLATE_NAME,
-            "taskType": "tabular_classification",
+            "taskType": _resolve_task_type(pipeline_metadata),
             "targetColumn": target,
             "seed": seed,
             "epochs": epochs,
@@ -643,7 +654,7 @@ def main() -> int:
                 "message": str(exc),
                 "traceback": traceback.format_exc(),
             },
-            "metadata": {"template": TEMPLATE_NAME, "taskType": "tabular_classification"},
+            "metadata": {"template": TEMPLATE_NAME, "taskType": _resolve_task_type({})},
         }
         try:
             write_result(payload)
