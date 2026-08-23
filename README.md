@@ -10,9 +10,18 @@ Key behavior:
 - creates stratified validation when `val.csv` is absent
 - stratified-caps training to the configured row limit
 - scores `test.csv` when present, after checkpoint selection
-- writes `best.ckpt`, `training_context.parquet`, and `artifact.json`
+- writes the served artifact — `best.ckpt`, `training_context.parquet`, and
+  `artifact.json` (the self-contained inference contract) — plus
+  `evaluation/report.json`, `logs/run-summary.json`, and best-effort
+  post-fit `progress/epoch_*.json`
 - reloads the fine-tuned checkpoint and predicts before reporting success
-- records dataset and checkpoint hashes in `result.json`
+- records dataset and checkpoint hashes in `result.json`, and emits the DIMER
+  export contract under `result.json["artifacts"]`: `modelArtifact` (`best.ckpt`)
+  is **mandatory** for export-to-repository / model-download, with
+  `trainingContext` as the second file the in-context learner needs at serve
+  time (`manifest`, `evaluationReport`, `logArtifact` alongside). Every path is
+  `/data`-relative, which is how the backend resolves it
+  (`workbench.domain._resolve_result_artifact`).
 
 `dimer-pipeline.json` defines the DIMER workbench fields. Pairs with `tabicl-classifier-dataset-validator`; full documentation is in `tabicl-classifier-pipeline`.
 
