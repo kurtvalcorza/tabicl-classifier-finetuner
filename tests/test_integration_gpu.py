@@ -51,6 +51,9 @@ def test_finetune_end_to_end(tmp_path, monkeypatch):
     art = json.loads((out / "tabicl_classifier" / "artifact.json").read_text())
     assert "inference" in art
     assert "categoricalEncoders" in art["inference"]
-    # epoch checkpoints pruned; only best.ckpt remains
-    ckpts = sorted((out / "tabicl_classifier" / "checkpoints").glob("*.ckpt"))
-    assert [p.name for p in ckpts] == ["best.ckpt"]
+    # bundle format v2: tabicl's pickles converted and removed; only best.safetensors is packaged
+    assert art["artifactFormat"] == "tabicl-dimer-classifier-v2"
+    assert sorted(p.name for p in (out / "tabicl_classifier").rglob("*.ckpt")) == []
+    files = sorted(p.name for p in (out / "tabicl_classifier" / "checkpoints").iterdir())
+    assert files == ["best.safetensors"]
+    assert payload["artifacts"]["modelArtifact"]["name"] == "best.safetensors"
